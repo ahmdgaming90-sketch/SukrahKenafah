@@ -1,0 +1,803 @@
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { 
+  ShoppingBag, Search, X, Plus, Minus, MapPin, Phone, 
+  MessageCircle, Lock, LayoutDashboard, Package, 
+  Image as ImageIcon, Settings, LogOut, Check, 
+  Trash2, Edit, Save, ArrowRight, Tag, Users, Palette, ShieldAlert, Upload
+} from 'lucide-react';
+
+// ==========================================
+// 1. DATABASE & INITIAL DATA (Secure Credentials)
+// ==========================================
+
+const INITIAL_USERS = [
+  { id: 1, username: 'HZM_Alpha99', password: 'Knf@Sukrah$2026!Xy', role: 'super_admin', active: true, name: 'المدير العام (الحازمي)' },
+  { id: 2, username: 'Sukrah_Opr77', password: 'Op#Gate2026%Knx', role: 'admin', active: true, name: 'مدير المحتوى' }
+];
+
+const THEMES = {
+  light: {
+    id: 'light', name: 'الكلاسيكي الفاخر (فاتح)', 
+    colors: { primary: '#B8860B', secondary: '#3E2723', bg: '#FDFBF7', cardBg: '#FFFFFF', text: '#3E2723', textMuted: '#8D7B68' }
+  },
+  dark: {
+    id: 'dark', name: 'الداكن الملكي (ليلي)', 
+    colors: { primary: '#D4AF37', secondary: '#1A1A1A', bg: '#121212', cardBg: '#1E1E1E', text: '#FDFBF7', textMuted: '#A0A0A0' }
+  },
+  rose: {
+    id: 'rose', name: 'الوردي الهادئ', 
+    colors: { primary: '#B76E79', secondary: '#4A3B3C', bg: '#FFF5F5', cardBg: '#FFFFFF', text: '#4A3B3C', textMuted: '#967376' }
+  }
+};
+
+const SEED_CATEGORIES = [
+  { id: 'c1', name: 'الكنافة', sortOrder: 1 },
+  { id: 'c2', name: 'سجنتشر', sortOrder: 2 },
+  { id: 'c3', name: 'الحلا', sortOrder: 3 },
+  { id: 'c5', name: 'القهوة', sortOrder: 4 }
+];
+
+const SEED_PRODUCTS = [
+  {
+    id: 'p1', name: 'كنافة محشية قشطة', desc: 'حلى شرقي بطبقات عجينة مقرمشة محشوة بالقشطة الطازجة.', categoryId: 'c1',
+    basePrice: 0, calories: 460, active: true, featured: true, bestSeller: true, image: '',
+    variants: [{ id: 'v1', name: 'صغير', price: 12 }, { id: 'v2', name: 'وسط', price: 25 }, { id: 'v3', name: 'كبير', price: 35 }],
+    addons: [{ id: 'a1', name: 'صوص لوتس', price: 3 }, { id: 'a2', name: 'صوص نوتيلا', price: 3 }, { id: 'a3', name: 'صوص بيستاشيو', price: 3 }]
+  },
+  {
+    id: 'p7', name: 'سجنتشر بستاشيو', desc: 'حلى فستق سيجنتشر، كريمي بطعم الفستق الغني.', categoryId: 'c2',
+    basePrice: 23, calories: 950, active: true, featured: true, bestSeller: false, variants: [], addons: []
+  },
+  {
+    id: 'p12', name: 'كيكة الكوكيز', desc: 'كيكة هشة ولذيذة تحتوي على قطع كوكيز الشوكولاتة الفاخرة.', categoryId: 'c3',
+    basePrice: 24, salePrice: 19.20, discountPercent: 20, calories: 1550, active: true, featured: false, bestSeller: true, variants: [], addons: []
+  }
+];
+
+const INITIAL_SETTINGS = {
+  name: 'كنافة سكره', shortName: 'سكره', tagline: 'للحلاوة عنوان', city: 'جدة',
+  phone: '0570207432', whatsapp: '+966570207432', status: 'open', openingTime: '14:00', pickupOnly: true,
+  heroTitle: 'تذوق الفخامة في كل قطعة', heroDesc: 'نصنع الحلا بشغف ليناسب ذوقك الرفيع.'
+};
+
+// ==========================================
+// 2. CONTEXT & STATE MANAGEMENT
+// ==========================================
+
+const StoreContext = createContext();
+
+const StoreProvider = ({ children }) => {
+  const [users, setUsers] = useState(INITIAL_USERS);
+  const [products, setProducts] = useState(SEED_PRODUCTS);
+  const [categories] = useState(SEED_CATEGORIES);
+  const [settings, setSettings] = useState(INITIAL_SETTINGS);
+  const [activeTheme, setActiveTheme] = useState('light');
+  
+  const [currentUser, setCurrentUser] = useState(null); // Auth State
+  const [cart, setCart] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // --- Dynamic Theme Injection ---
+  useEffect(() => {
+    if (!document.getElementById('alexandria-font')) {
+      const link = document.createElement('link');
+      link.id = 'alexandria-font';
+      link.href = 'https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;600;800&display=swap';
+      link.rel = 'stylesheet';
+      document.head.appendChild(link);
+    }
+    
+    const theme = THEMES[activeTheme].colors;
+    const style = document.createElement('style');
+    style.innerHTML = `
+      :root {
+        --color-primary: ${theme.primary};
+        --color-secondary: ${theme.secondary};
+        --color-bg: ${theme.bg};
+        --color-card-bg: ${theme.cardBg};
+        --color-text: ${theme.text};
+        --color-text-muted: ${theme.textMuted};
+      }
+      body { 
+        font-family: 'Alexandria', sans-serif; 
+        background-color: var(--color-bg);
+        color: var(--color-text);
+      }
+      .theme-bg { background-color: var(--color-bg); }
+      .theme-card { background-color: var(--color-card-bg); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); border: 1px solid rgba(150,150,150,0.1); }
+      .theme-text { color: var(--color-text); }
+      .theme-text-muted { color: var(--color-text-muted); }
+      .theme-primary-bg { background-color: var(--color-primary); color: #fff; }
+      .theme-primary-text { color: var(--color-primary); }
+      .glass-nav { background: color-mix(in srgb, var(--color-bg) 85%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(150,150,150,0.1); }
+    `;
+    const oldStyle = document.getElementById('theme-styles');
+    if (oldStyle) oldStyle.remove();
+    style.id = 'theme-styles';
+    document.head.appendChild(style);
+  }, [activeTheme]);
+
+  // --- Cart Logic ---
+  const addToCart = (item) => {
+    const itemId = `${item.product.id}-${item.variant?.id || 'none'}-${item.addons.map(a=>a.id).sort().join('_')}-${item.notes}`;
+    const exist = cart.findIndex(c => c.cartId === itemId);
+    if (exist > -1) {
+      const newCart = [...cart]; newCart[exist].qty += item.qty; setCart(newCart);
+    } else setCart([...cart, { ...item, cartId: itemId }]);
+    setSelectedProduct(null);
+  };
+  const updateCartQty = (id, delta) => setCart(cart.map(i => i.cartId === id ? { ...i, qty: i.qty + delta } : i).filter(i => i.qty > 0));
+  const removeFromCart = (id) => setCart(cart.filter(i => i.cartId !== id));
+
+  return (
+    <StoreContext.Provider value={{
+      db: { users, products, categories, settings, themes: THEMES, activeTheme },
+      admin: { setUsers, setProducts, setSettings, setActiveTheme, currentUser, setCurrentUser },
+      cartState: { cart, addToCart, updateCartQty, removeFromCart, total: cart.reduce((s, i) => s + (i.unitPrice * i.qty), 0), count: cart.reduce((s, i) => s + i.qty, 0), isCartOpen, setIsCartOpen },
+      ui: { selectedProduct, setSelectedProduct, isSearchOpen, setIsSearchOpen }
+    }}>
+      {children}
+    </StoreContext.Provider>
+  );
+};
+
+const useStore = () => useContext(StoreContext);
+
+// ==========================================
+// 3. SHARED UI COMPONENTS
+// ==========================================
+
+const LuxuryPlaceholder = () => (
+  <div className="w-full h-full flex items-center justify-center relative overflow-hidden" style={{ background: 'linear-gradient(135deg, var(--color-card-bg) 0%, var(--color-bg) 100%)' }}>
+    <div className="absolute inset-0 opacity-5 bg-[radial-gradient(circle_at_center,_var(--color-primary)_0%,_transparent_70%)]"></div>
+    <span className="theme-text-muted font-bold text-2xl tracking-widest opacity-20 select-none">SUKRAH</span>
+  </div>
+);
+
+// ==========================================
+// 4. CUSTOMER WEBSITE
+// ==========================================
+
+const CustomerHeader = () => {
+  const { db, cartState, ui } = useStore();
+  return (
+    <header className="sticky top-0 z-40 glass-nav transition-all duration-300">
+      <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
+        <div className="flex flex-col">
+          <h1 className="text-3xl font-extrabold theme-text tracking-tight">{db.settings.shortName}</h1>
+          <span className="text-sm font-medium theme-primary-text">{db.settings.tagline}</span>
+        </div>
+        <div className="flex items-center gap-5">
+          <button onClick={() => ui.setIsSearchOpen(true)} className="p-3 rounded-full hover:bg-black/5 transition-all">
+            <Search size={24} className="theme-text" />
+          </button>
+          <button onClick={() => cartState.setIsCartOpen(true)} className="p-3 relative rounded-full hover:bg-black/5 transition-all">
+            <ShoppingBag size={24} className="theme-text" />
+            {cartState.count > 0 && (
+              <span className="absolute top-1 right-1 theme-primary-bg text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                {cartState.count}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+const HeroSection = () => {
+  const { db } = useStore();
+  const isOpen = db.settings.status === 'open';
+
+  return (
+    <div className="relative py-32 px-6 overflow-hidden flex items-center justify-center text-center" style={{ backgroundColor: 'var(--color-secondary)' }}>
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[150%] theme-primary-bg opacity-10 blur-[120px] rounded-full rotate-45"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[40%] h-[100%] theme-primary-bg opacity-10 blur-[100px] rounded-full"></div>
+      </div>
+
+      <div className="relative z-10 max-w-3xl mx-auto flex flex-col items-center">
+        <div className="mb-8 p-[1px] rounded-full" style={{ background: 'linear-gradient(90deg, transparent, var(--color-primary), transparent)' }}>
+          <div className="px-6 py-2 rounded-full" style={{ backgroundColor: 'var(--color-secondary)' }}>
+             <span className={`text-sm font-bold flex items-center gap-2 ${isOpen ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
+                {isOpen ? 'مستعدون لاستقبال طلباتكم' : `مغلق الآن - نفتح ${db.settings.openingTime}`}
+             </span>
+          </div>
+        </div>
+        
+        <h2 className="text-5xl md:text-7xl font-black mb-6 text-white leading-tight" style={{ textShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+          {db.settings.heroTitle}
+        </h2>
+        <p className="text-lg md:text-xl text-white/80 mb-12 max-w-xl font-light leading-relaxed">
+          {db.settings.heroDesc}
+        </p>
+        
+        <a href="#menu" className="theme-primary-bg px-10 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform duration-300 shadow-[0_10px_40px_rgba(0,0,0,0.2)]">
+          تصفح قائمة الطعام
+        </a>
+      </div>
+    </div>
+  );
+};
+
+const ProductCard = ({ product }) => {
+  const { ui } = useStore();
+  const price = product.salePrice || product.basePrice;
+  const hasVariants = product.variants && product.variants.length > 0;
+  const displayPrice = hasVariants ? product.variants[0].price : price;
+
+  return (
+    <div onClick={() => ui.setSelectedProduct(product)} className="theme-card rounded-[2rem] overflow-hidden group cursor-pointer hover:-translate-y-2 transition-all duration-500 flex flex-col h-full relative">
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+        {product.discountPercent && <span className="bg-red-500/90 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full">خصم {product.discountPercent}%</span>}
+        {product.bestSeller && <span className="theme-primary-bg backdrop-blur text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">الأكثر مبيعاً</span>}
+      </div>
+
+      <div className="relative aspect-[4/3] overflow-hidden bg-black/5">
+        {product.image ? (
+           <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700 ease-out" />
+        ) : <LuxuryPlaceholder />}
+      </div>
+      
+      <div className="p-6 flex flex-col flex-grow">
+        <h3 className="font-bold text-xl theme-text mb-2 line-clamp-1">{product.name}</h3>
+        <p className="text-sm theme-text-muted line-clamp-2 mb-6 flex-grow leading-relaxed">{product.desc || 'نكهة فريدة ومميزة.'}</p>
+        
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-black/5">
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wider theme-text-muted font-bold mb-1">{hasVariants ? 'يبدأ من' : 'السعر'}</span>
+            <div className="flex items-center gap-2">
+               <span className="font-black text-2xl theme-primary-text">{displayPrice} ﷼</span>
+               {!hasVariants && product.basePrice > product.salePrice && (
+                 <span className="text-sm theme-text-muted line-through">{product.basePrice} ﷼</span>
+               )}
+            </div>
+          </div>
+          <button className="theme-primary-bg w-12 h-12 rounded-full flex items-center justify-center group-hover:rotate-90 transition-transform duration-300 shadow-md">
+            <Plus size={20} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProductModal = () => {
+  const { ui, cartState } = useStore();
+  const product = ui.selectedProduct;
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [selectedAddons, setSelectedAddons] = useState([]);
+  const [qty, setQty] = useState(1);
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (product) {
+      setSelectedVariant(product.variants?.length > 0 ? product.variants[0] : null);
+      setSelectedAddons([]); setQty(1); setNotes('');
+    }
+  }, [product]);
+
+  if (!product) return null;
+
+  const toggleAddon = (addon) => {
+    const exists = selectedAddons.find(a => a.id === addon.id);
+    if (exists) setSelectedAddons(selectedAddons.filter(a => a.id !== addon.id));
+    else setSelectedAddons([...selectedAddons, addon]);
+  };
+
+  const unitPrice = (selectedVariant ? selectedVariant.price : (product.salePrice || product.basePrice)) + selectedAddons.reduce((s, a) => s + a.price, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => ui.setSelectedProduct(null)}></div>
+      
+      <div className="theme-card w-full max-w-2xl md:rounded-[3rem] rounded-t-[3rem] overflow-hidden flex flex-col max-h-[90vh] md:max-h-[85vh] relative z-10 animate-slide-up shadow-2xl">
+        <button onClick={() => ui.setSelectedProduct(null)} className="absolute top-6 right-6 z-20 bg-white/20 backdrop-blur-md p-3 rounded-full text-white shadow-lg hover:bg-white/30 transition">
+          <X size={20} />
+        </button>
+
+        <div className="overflow-y-auto flex-grow pb-32 no-scrollbar">
+          <div className="w-full h-72 md:h-96 relative">
+             {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <LuxuryPlaceholder />}
+             <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-card-bg)] via-transparent to-transparent"></div>
+          </div>
+          
+          <div className="px-6 md:px-10 pb-6 -mt-10 relative z-10">
+            <h2 className="text-3xl md:text-4xl font-black theme-text mb-3">{product.name}</h2>
+            <p className="text-lg theme-text-muted leading-relaxed mb-6">{product.desc}</p>
+            
+            <div className="space-y-8">
+              {product.variants?.length > 0 && (
+                <div>
+                  <h3 className="font-bold theme-text mb-4 flex items-center gap-2"><div className="w-1.5 h-6 theme-primary-bg rounded-full"></div> اختر الحجم</h3>
+                  <div className="grid gap-3">
+                    {product.variants.map(v => (
+                      <label key={v.id} onClick={() => setSelectedVariant(v)} className={`flex items-center justify-between p-5 rounded-2xl cursor-pointer transition-all ${selectedVariant?.id === v.id ? 'theme-primary-bg shadow-lg' : 'border border-black/10 hover:border-[var(--color-primary)]'}`}>
+                        <span className={`font-bold ${selectedVariant?.id === v.id ? 'text-white' : 'theme-text'}`}>{v.name}</span>
+                        <span className={`font-black ${selectedVariant?.id === v.id ? 'text-white' : 'theme-primary-text'}`}>{v.price} ﷼</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {product.addons?.length > 0 && (
+                <div>
+                  <h3 className="font-bold theme-text mb-4 flex items-center gap-2"><div className="w-1.5 h-6 theme-primary-bg rounded-full"></div> إضافات (اختياري)</h3>
+                  <div className="grid gap-3">
+                    {product.addons.map(a => {
+                      const isSelected = selectedAddons.some(sa => sa.id === a.id);
+                      return (
+                        <label key={a.id} onClick={() => toggleAddon(a)} className={`flex items-center justify-between p-5 rounded-2xl cursor-pointer transition-all ${isSelected ? 'theme-primary-bg shadow-lg' : 'border border-black/10 hover:border-[var(--color-primary)]'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${isSelected ? 'border-white' : 'border-gray-300'}`}>
+                              {isSelected && <Check size={16} className="text-white" />}
+                            </div>
+                            <span className={`font-bold ${isSelected ? 'text-white' : 'theme-text'}`}>{a.name}</span>
+                          </div>
+                          <span className={`font-black ${isSelected ? 'text-white' : 'theme-text-muted'}`}>+{a.price} ﷼</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h3 className="font-bold theme-text mb-4 flex items-center gap-2"><div className="w-1.5 h-6 theme-primary-bg rounded-full"></div> ملاحظات خاصة</h3>
+                <textarea className="w-full bg-black/5 border-none rounded-2xl p-5 focus:ring-2 focus:ring-[var(--color-primary)] outline-none theme-text resize-none" rows="3" placeholder="بدون مكسرات..." value={notes} onChange={(e) => setNotes(e.target.value)}></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 p-6 glass-nav border-t-0 shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
+           <div className="flex items-center gap-4">
+             <div className="flex items-center bg-black/5 rounded-2xl p-1">
+                <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-4 theme-text hover:bg-black/5 rounded-xl transition"><Minus size={20} /></button>
+                <span className="w-8 text-center font-black text-xl theme-text">{qty}</span>
+                <button onClick={() => setQty(qty + 1)} className="p-4 theme-text hover:bg-black/5 rounded-xl transition"><Plus size={20} /></button>
+             </div>
+             <button onClick={() => cartState.addToCart({ product, variant: selectedVariant, addons: selectedAddons, notes, qty, unitPrice })} className="flex-grow theme-primary-bg h-[68px] rounded-2xl font-bold text-lg flex items-center justify-between px-8 shadow-[0_10px_30px_rgba(var(--color-primary),0.3)] hover:scale-[1.02] transition-transform">
+                <span>إضافة للسلة</span>
+                <span className="text-xl font-black">{(unitPrice * qty).toFixed(2)} ﷼</span>
+             </button>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CartDrawer = () => {
+  const { cartState, db } = useStore();
+  const { cart, removeFromCart, updateCartQty, total, isCartOpen, setIsCartOpen } = cartState;
+
+  const handleOrder = () => {
+    let msg = `السلام عليكم 🌿\nأرغب في تجهيز طلب من ${db.settings.name}:\n\n`;
+    cart.forEach((item, i) => {
+      msg += `▪️ ${item.product.name} ${item.variant ? `(${item.variant.name})` : ''}\n`;
+      if (item.addons.length) msg += `   إضافات: ${item.addons.map(a => a.name).join('، ')}\n`;
+      if (item.notes) msg += `   ملاحظة: ${item.notes}\n`;
+      msg += `   الكمية: ${item.qty} | السعر: ${(item.unitPrice * item.qty).toFixed(2)} ﷼\n\n`;
+    });
+    msg += `━━━━━━━━━━━━\nالإجمالي: ${total.toFixed(2)} ﷼\nاستلام من المطعم 📍\nشكرًا لكم.`;
+    window.open(`https://wa.me/${db.settings.whatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  if (!isCartOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
+      <div className="theme-card w-full max-w-md h-full flex flex-col relative z-10 animate-slide-right shadow-2xl">
+        <div className="p-6 border-b border-black/5 flex items-center justify-between">
+          <h2 className="text-2xl font-black theme-text">سلة الطلبات</h2>
+          <button onClick={() => setIsCartOpen(false)} className="p-2 bg-black/5 rounded-full theme-text hover:bg-black/10 transition"><X size={20} /></button>
+        </div>
+        
+        <div className="flex-grow overflow-y-auto p-6">
+          {cart.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center opacity-40">
+              <ShoppingBag size={80} className="mb-6 theme-text" strokeWidth={1} />
+              <h3 className="text-xl font-bold theme-text">السلة فارغة</h3>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cart.map((item) => (
+                <div key={item.cartId} className="bg-black/5 p-4 rounded-2xl flex gap-4">
+                   <div className="flex-grow">
+                     <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold theme-text text-lg">{item.product.name}</h4>
+                        <button onClick={() => removeFromCart(item.cartId)} className="text-red-400 hover:text-red-600 p-1 bg-white/50 rounded-full shadow-sm"><Trash2 size={16} /></button>
+                     </div>
+                     {item.variant && <div className="text-sm theme-text-muted mb-1">{item.variant.name}</div>}
+                     <div className="flex items-center justify-between mt-4">
+                        <div className="font-black theme-primary-text text-lg">{(item.unitPrice * item.qty).toFixed(2)} ﷼</div>
+                        <div className="flex items-center bg-white rounded-xl shadow-sm border border-black/5">
+                          <button onClick={() => updateCartQty(item.cartId, -1)} className="p-2 theme-text hover:bg-black/5 rounded-r-xl"><Minus size={14} /></button>
+                          <span className="w-8 text-center font-bold text-sm theme-text">{item.qty}</span>
+                          <button onClick={() => updateCartQty(item.cartId, 1)} className="p-2 theme-text hover:bg-black/5 rounded-l-xl"><Plus size={14} /></button>
+                        </div>
+                     </div>
+                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {cart.length > 0 && (
+          <div className="p-6 glass-nav border-t-0 shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+            <div className="flex justify-between items-center mb-6">
+              <span className="theme-text-muted font-bold text-lg">الإجمالي</span>
+              <span className="text-3xl font-black theme-text">{total.toFixed(2)} ﷼</span>
+            </div>
+            <button onClick={handleOrder} className="w-full bg-[#25D366] text-white py-5 rounded-2xl font-bold text-xl hover:bg-[#1ebd5a] transition flex items-center justify-center gap-3 shadow-[0_10px_20px_rgba(37,211,102,0.3)] hover:-translate-y-1">
+              <MessageCircle size={24} /> إرسال الطلب عبر واتساب
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CustomerApp = () => {
+  const { db } = useStore();
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [secretCount, setSecretCount] = useState(0); // Secret Vault Counter
+
+  const visibleProducts = db.products.filter(p => p.active);
+  const displayedProducts = activeCategory === 'all' ? visibleProducts : visibleProducts.filter(p => p.categoryId === activeCategory);
+
+  // Hidden Vault Entry Logic (5 quick clicks on ALHAZMI copyright text)
+  const handleSecretVaultClick = () => {
+    const newCount = secretCount + 1;
+    setSecretCount(newCount);
+    
+    if (newCount >= 5) {
+      window.location.hash = '#/hzm-secure-vault-26'; // Redirect to the vault securely
+      setSecretCount(0);
+    }
+    
+    // Reset counter if they stop clicking (after 3 seconds)
+    setTimeout(() => {
+      setSecretCount(0);
+    }, 3000);
+  };
+
+  return (
+    <div className="min-h-screen theme-bg transition-colors duration-500 selection:bg-[var(--color-primary)] selection:text-white pb-20" dir="rtl">
+      <CustomerHeader />
+      <HeroSection />
+      
+      <main className="max-w-7xl mx-auto px-6 py-16">
+        <section id="menu" className="scroll-mt-32">
+          <div className="flex items-center gap-3 w-max mx-auto md:mx-0 overflow-x-auto pb-8 no-scrollbar">
+            <button onClick={() => setActiveCategory('all')} className={`px-8 py-3 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeCategory === 'all' ? 'theme-primary-bg shadow-lg' : 'bg-black/5 theme-text hover:bg-black/10'}`}>الكل</button>
+            {db.categories.map(c => (
+              <button key={c.id} onClick={() => setActiveCategory(c.id)} className={`px-8 py-3 rounded-full font-bold text-sm transition-all whitespace-nowrap ${activeCategory === c.id ? 'theme-primary-bg shadow-lg' : 'bg-black/5 theme-text hover:bg-black/10'}`}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+             {displayedProducts.map(product => <ProductCard key={product.id} product={product} />)}
+          </div>
+        </section>
+      </main>
+
+      <footer className="mt-20 pt-16 pb-8 border-t border-black/5" style={{ backgroundColor: 'var(--color-secondary)' }}>
+        <div className="max-w-7xl mx-auto px-6 text-center text-white">
+          <h2 className="text-4xl font-black mb-4">{db.settings.name}</h2>
+          <p className="text-white/60 mb-12 max-w-sm mx-auto">{db.settings.heroDesc}</p>
+          
+          <div className="pt-8 border-t border-white/10 flex flex-col items-center justify-center gap-2">
+            {/* THIS IS THE SECRET DOOR */}
+            <p 
+              onClick={handleSecretVaultClick} 
+              className="text-sm font-bold text-white/50 tracking-widest cursor-default select-none"
+            >
+              تصميم ALHAZMI | 0535717670
+            </p>
+            <p className="text-xs text-white/30 font-serif">© {new Date().getFullYear()} All Rights Reserved.</p>
+          </div>
+        </div>
+      </footer>
+      
+      <ProductModal />
+      <CartDrawer />
+    </div>
+  );
+};
+
+
+// ==========================================
+// 5. ADMIN CMS (Secret & Secure Vault)
+// ==========================================
+
+const AdminLogin = () => {
+  const { db, admin } = useStore();
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    const matchedUser = db.users.find(u => u.username.toLowerCase() === user.toLowerCase() && u.password.toLowerCase() === pass.toLowerCase());
+    
+    if (matchedUser) {
+      if (matchedUser.active) {
+        admin.setCurrentUser(matchedUser);
+      } else {
+        setError('تم إيقاف هذا الحساب من قبل الإدارة.');
+      }
+    } else {
+      setError('بيانات الدخول غير صحيحة أو غير مصرح بها');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#121212] flex items-center justify-center p-6" dir="rtl">
+      <div className="bg-[#1E1E1E] p-10 rounded-[2rem] shadow-2xl w-full max-w-md border border-white/10 relative overflow-hidden">
+        
+        {/* Return to main site subtly */}
+        <button onClick={() => window.location.hash = ''} className="absolute top-6 left-6 text-white/30 hover:text-white transition">
+          <ArrowRight size={24} />
+        </button>
+
+        <div className="text-center mb-10 mt-4">
+          <div className="w-20 h-20 bg-[#D4AF37]/10 text-[#D4AF37] rounded-3xl flex items-center justify-center mx-auto mb-6"><Lock size={40} /></div>
+          <h1 className="text-3xl font-black text-white mb-2">النظام الأمني المغلق</h1>
+          <p className="text-white/50">محاولة دخول مصرحة فقط للآدمن</p>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-6">
+          <input type="text" placeholder="معرف المستخدم" required value={user} onChange={e=>setUser(e.target.value)} className="w-full px-5 py-4 bg-black/30 rounded-xl border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none transition" dir="ltr" />
+          <input type="password" placeholder="كلمة المرور الأمنية" required value={pass} onChange={e=>setPass(e.target.value)} className="w-full px-5 py-4 bg-black/30 rounded-xl border border-white/10 text-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none transition" dir="ltr" />
+          {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-lg text-sm text-center font-bold">{error}</div>}
+          <button type="submit" className="w-full bg-[#D4AF37] text-black py-4 rounded-xl font-black text-lg hover:bg-[#b5952f] transition shadow-[0_10px_30px_rgba(212,175,55,0.2)]">تحقق ودخول</button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const AdminDashboard = () => {
+  const { db, admin } = useStore();
+  const [activeTab, setActiveTab] = useState('products');
+  const isSuperAdmin = admin.currentUser.role === 'super_admin';
+
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [formData, setFormData] = useState({});
+
+  const openEditor = (prod = null) => {
+    setFormData(prod || {
+      id: `p_${Date.now()}`, name: '', desc: '', categoryId: db.categories[0].id, image: '', 
+      basePrice: 0, salePrice: '', discountPercent: '', calories: '', 
+      active: true, featured: false, bestSeller: false, variants: [], addons: []
+    });
+    setEditingProduct(prod ? true : false);
+    setIsAddingProduct(true);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, image: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveProduct = () => {
+    if (editingProduct) admin.setProducts(db.products.map(p => p.id === formData.id ? formData : p));
+    else admin.setProducts([...db.products, formData]);
+    setIsAddingProduct(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans" dir="rtl">
+      <aside className="w-full md:w-72 bg-[#1A1A1A] text-white flex flex-col flex-shrink-0 shadow-2xl z-20 relative">
+        <div className="p-8 border-b border-white/10">
+          <h1 className="text-2xl font-black text-[#D4AF37]">لوحة التحكم</h1>
+          <p className="text-white/40 text-sm mt-2 flex items-center gap-2"><ShieldAlert size={14}/> {admin.currentUser.name}</p>
+        </div>
+        <nav className="flex-grow p-4 space-y-2">
+          <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all font-bold ${activeTab === 'products' ? 'bg-[#D4AF37] text-black shadow-lg' : 'text-white/60 hover:bg-white/5'}`}><Package size={20} /> إدارة المنتجات</button>
+          
+          {isSuperAdmin && (
+            <>
+              <button onClick={() => setActiveTab('themes')} className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all font-bold ${activeTab === 'themes' ? 'bg-[#D4AF37] text-black shadow-lg' : 'text-white/60 hover:bg-white/5'}`}><Palette size={20} /> المظهر والثيمات</button>
+              <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all font-bold ${activeTab === 'users' ? 'bg-[#D4AF37] text-black shadow-lg' : 'text-white/60 hover:bg-white/5'}`}><Users size={20} /> إدارة المدراء</button>
+            </>
+          )}
+        </nav>
+        <div className="p-6 border-t border-white/10">
+           <button onClick={() => { admin.setCurrentUser(null); window.location.hash = ''; }} className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition font-bold">
+              <LogOut size={20} /> قفل النظام والخروج
+           </button>
+        </div>
+      </aside>
+
+      <main className="flex-grow p-4 md:p-10 overflow-y-auto bg-gray-50 relative z-10">
+        
+        {activeTab === 'products' && !isAddingProduct && (
+          <div className="space-y-6 max-w-6xl mx-auto">
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+              <h2 className="text-2xl font-black text-gray-800">المنتجات ({db.products.length})</h2>
+              <button onClick={() => openEditor()} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-600/20"><Plus size={20} /> إضافة صنف</button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {db.products.map(product => (
+                <div key={product.id} className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 relative group">
+                  <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100 mb-4 relative">
+                    {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <div className="flex items-center justify-center h-full text-gray-400"><ImageIcon size={40}/></div>}
+                    {!product.active && <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center font-bold text-red-600">مخفي</div>}
+                  </div>
+                  <h3 className="font-bold text-lg mb-1">{product.name}</h3>
+                  <p className="text-gray-500 font-bold mb-4">{product.basePrice} ﷼</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => openEditor(product)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-xl font-bold hover:bg-gray-200">تعديل</button>
+                    <button onClick={() => { if(confirm('متأكد من الحذف؟')) admin.setProducts(db.products.filter(p=>p.id !== product.id)) }} className="bg-red-50 text-red-600 p-2 rounded-xl hover:bg-red-100"><Trash2 size={20}/></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isAddingProduct && (
+          <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+               <h2 className="text-2xl font-black">{editingProduct ? 'تعديل الصنف' : 'صنف جديد'}</h2>
+               <button onClick={() => setIsAddingProduct(false)} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><X/></button>
+             </div>
+             
+             <div className="p-8 space-y-8">
+               <div className="flex flex-col md:flex-row gap-8">
+                 <div className="w-full md:w-1/3">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">صورة الصنف</label>
+                    <div className="relative aspect-square bg-gray-100 rounded-3xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center overflow-hidden group cursor-pointer hover:bg-gray-50 transition">
+                      {formData.image ? (
+                        <>
+                          <img src={formData.image} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                            <span className="text-white font-bold flex items-center gap-2"><Upload size={18}/> تغيير الصورة</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-gray-400 flex flex-col items-center gap-2">
+                          <ImageIcon size={48} strokeWidth={1} />
+                          <span className="text-sm font-bold">اضغط لرفع صورة من جهازك</span>
+                        </div>
+                      )}
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    </div>
+                 </div>
+
+                 <div className="w-full md:w-2/3 space-y-5">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">اسم الصنف</label>
+                      <input type="text" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-blue-500 focus:bg-white" />
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">السعر الأساسي (﷼)</label>
+                        <input type="number" value={formData.basePrice} onChange={e=>setFormData({...formData, basePrice: Number(e.target.value)})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-blue-500 focus:bg-white" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">القسم</label>
+                        <select value={formData.categoryId} onChange={e=>setFormData({...formData, categoryId: e.target.value})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-blue-500 focus:bg-white">
+                          {db.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">الوصف</label>
+                      <textarea value={formData.desc} onChange={e=>setFormData({...formData, desc: e.target.value})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-blue-500 focus:bg-white h-28 resize-none" />
+                    </div>
+                 </div>
+               </div>
+               
+               <div className="flex gap-4 pt-6 border-t border-gray-100">
+                  <label className="flex items-center gap-3 cursor-pointer bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                    <input type="checkbox" checked={formData.active} onChange={e=>setFormData({...formData, active: e.target.checked})} className="w-5 h-5 accent-blue-600 rounded" /> <span className="font-bold text-gray-700">متاح للطلب</span>
+                  </label>
+               </div>
+               
+               <button onClick={saveProduct} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition">
+                 حفظ الصنف
+               </button>
+             </div>
+          </div>
+        )}
+
+        {activeTab === 'themes' && isSuperAdmin && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <h2 className="text-3xl font-black text-gray-800 mb-8">المظهر والثيمات (حصري للإدارة العليا)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {Object.values(db.themes).map(theme => (
+                <div key={theme.id} onClick={() => admin.setActiveTheme(theme.id)} className={`cursor-pointer rounded-3xl p-6 border-4 transition-all ${db.activeTheme === theme.id ? 'border-blue-500 shadow-xl scale-105' : 'border-transparent bg-white shadow-sm hover:shadow-md'}`}>
+                   <div className="h-32 rounded-2xl mb-4 relative overflow-hidden" style={{ backgroundColor: theme.colors.bg }}>
+                      <div className="absolute bottom-0 left-0 right-0 h-1/2" style={{ backgroundColor: theme.colors.cardBg }}></div>
+                      <div className="absolute top-4 right-4 w-12 h-4 rounded-full" style={{ backgroundColor: theme.colors.primary }}></div>
+                   </div>
+                   <h3 className="font-black text-lg text-center text-gray-800">{theme.name}</h3>
+                   {db.activeTheme === theme.id && <div className="mt-4 bg-blue-100 text-blue-700 text-center py-2 rounded-xl font-bold text-sm">مفعل حالياً</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'users' && isSuperAdmin && (
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-black text-gray-800 mb-8">إدارة المدراء</h2>
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+               {db.users.map(user => (
+                 <div key={user.id} className="p-6 border-b border-gray-100 flex items-center justify-between hover:bg-gray-50 transition">
+                    <div>
+                      <h4 className="font-black text-lg text-gray-800">{user.name} <span className="text-sm font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded-md ml-2">@{user.username}</span></h4>
+                      <p className="text-sm text-gray-500 mt-1">{user.role === 'super_admin' ? 'صلاحيات كاملة (لا يمكن حظره)' : 'صلاحيات إدارة المحتوى فقط'}</p>
+                    </div>
+                    {user.role !== 'super_admin' && (
+                      <button 
+                        onClick={() => {
+                          admin.setUsers(db.users.map(u => u.id === user.id ? {...u, active: !u.active} : u));
+                        }}
+                        className={`px-6 py-3 rounded-xl font-bold transition ${user.active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                      >
+                        {user.active ? 'حظر الآدمن' : 'رفع الحظر'}
+                      </button>
+                    )}
+                    {user.role === 'super_admin' && <span className="text-blue-500 bg-blue-50 px-4 py-2 rounded-xl font-bold text-sm">أنت</span>}
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+};
+
+// ==========================================
+// 6. MAIN APP ROUTER (Vault Router logic)
+// ==========================================
+
+const AppRouter = () => {
+  const [currentPath, setCurrentPath] = useState(window.location.hash);
+  const { admin } = useStore();
+
+  useEffect(() => {
+    const handleHashChange = () => setCurrentPath(window.location.hash);
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const isAdminRoute = currentPath.startsWith('#/hzm-secure-vault-26');
+
+  if (isAdminRoute) {
+    if (!admin.currentUser) return <AdminLogin />;
+    return <AdminDashboard />;
+  }
+  return <CustomerApp />;
+};
+
+export default function App() {
+  return (
+    <StoreProvider>
+      <AppRouter />
+    </StoreProvider>
+  );
+}
